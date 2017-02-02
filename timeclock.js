@@ -55,26 +55,26 @@ class App {
 
     let defaultName = ''
 
+    let showPrompt = (defaultAnswer) => {
+      _reader.question(`Task name [${defaultAnswer}]: `, (answer) => {
+        this.state.data = Object.assign(this.state.data, {
+          start: new Date(),
+          description: answer || defaultAnswer
+        })
+        this.run()
+        _reader.close()
+      })
+    }
+
     last.read(this.state.filePath, 1)
       .then((line) => {
-        console.log(0, line)
         csv.fromString(line)
           .on('data', (data) => {
-            console.log(data[2])
-            defaultName = data[2]
+            showPrompt(data[2])
           })
-      }, (bad) => {
-        console.log(`Dis iz bad`)
+      }, (error) => {
+        showPrompt('')
       })
-
-    _reader.question(`Task name [${defaultName}]: `, (answer) => {
-      this.state.data = Object.assign(this.state.data, {
-        start: new Date(),
-        description: answer
-      })
-      this.run()
-      _reader.close()
-    })
   }
 
   run() {
