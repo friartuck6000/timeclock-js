@@ -10,6 +10,10 @@ const yargs    = require('yargs')
 // Set the filename that the CSV data should be written to
 const FILENAME = '_timeclock.csv'
 
+// Set the number of MINUTES of inactivity allowed before the timeclock
+// automatically stops
+const TIMEOUT = 1
+
 let state = {
   path: null,
   filename: FILENAME,
@@ -33,6 +37,7 @@ class App {
       path: argv._[0] || process.cwd(),
     })
     this.state.filePath = `${this.state.path}/${this.state.filename}`
+    this.waitTimeout = null
   }
 
   _write() {
@@ -47,90 +52,66 @@ class App {
     process.stdout.write('\n')
   }
 
-  init() {
-    const _reader = readline.createInterface({
+  _showPrompt(defaultName) {
+    const reader = readline.createInterface({
       input: process.stdin,
       output: process.stdout
     })
-
-    let defaultName = ''
-
-    let showPrompt = (defaultAnswer) => {
-      _reader.question(`Task name [${defaultAnswer}]: `, (answer) => {
-        this.state.data = Object.assign(this.state.data, {
-          start: new Date(),
-          description: answer || defaultAnswer
-        })
-        this.run()
-        _reader.close()
+    reader.question(chalk.cyan(`Task name [${defaultName}]: `), (name) => {
+      this.state.data = Object.assign(this.state.data, {
+        start: new Date(),
+        description: name || defaultName
       })
-    }
+      this.run()
+      reader.close()
+    })
+  }
 
+  _wait() {
+    clearTimeout(this.waitTimeout)
+    setTimeout(() => {
+      this._writeln(chalk.yellow('\nStopping timeclock due to inactivity.'))
+      this.finish()
+    }, TIMEOUT * 60000)
+  }
+
+  init() {
     last.read(this.state.filePath, 1)
       .then((line) => {
         csv.fromString(line)
           .on('data', (data) => {
-            showPrompt(data[2])
+            this._showPrompt(data[2])
           })
       }, (error) => {
-        showPrompt('')
+        this._showPrompt('')
       })
   }
 
   run() {
-    this._writeln(chalk.cyan('Doin stuff...'))
-    this.finish()
+    this._wait()
+    chokidar.watch(this.state.path, (e, p) => {
+      console.log(e, p)
+      this._wait()
+    })
+
+    process.on('SIGINT', () => {
+      this._writeln(chalk.yellow('\nStopping timeclock manually.'))
+      this.finish()
+    })
   }
 
   finish() {
-    this._writeln(chalk.green('All done'))
     this.state.data.end = new Date()
+    let _d = this.state.data.end
 
-    console.log(this.state)
+    console.log(`Before:`, chalk.green(_d))
+
+    // 8:00 -> 8:00
+    // 8:01 -> 8:00
+    // 8:05 -> 8:15
+    process.exit()
   }
 }
 
 let app = new App(yargs.argv)
 app.init()
-
-
-let initialize = (args) => {
-
-  writeln('test')
-
-  // Initialize I/O
-  /*
-  const reader = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  })
-  */
-
-  // Prompt for a description of the work you're about to do
-  /*
-  reader.question(`Bro, tell me:\n> `, (answer) => {
-
-    const state = {
-      path: args._[0] || process.cwd(),
-      filename: FILENAME,
-      data: {
-        start: new Date(),
-        end: null,
-        description: answer
-      }
-    }
-
-    run(state)
-    reader.close()
-  })
-  */
-}
-
-let run = (state) => {
-  // console.log(state)
-  finish(state)
-}
-
-let finish = (state) => {
-  console.log(state)
-}
