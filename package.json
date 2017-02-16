@@ -2,18 +2,31 @@
   "name": "timeclock-js",
   "version": "1.0.0",
   "description": "Simple timeclock utility",
-  "main": "timeclock.js",
+  "main": "dist/timeclock.js",
+  "bin": {
+    "timeclock": "dist/timeclock.js"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "babel -d dist/ src/",
+    "dev": "babel -w -d dist/ src/"
   },
   "author": "",
   "license": "MIT",
-  "devDependencies": {},
+  "devDependencies": {
+    "babel-cli": "^6.23.0",
+    "babel-preset-es2015-node": "^6.1.1"
+  },
   "dependencies": {
+    "babel-polyfill": "^6.23.0",
     "chalk": "^1.1.3",
     "chokidar": "^1.6.1",
     "fast-csv": "^2.3.1",
     "read-last-lines": "^1.1.0",
     "yargs": "^6.6.0"
+  },
+  "babel": {
+    "presets": [
+      "es2015-node"
+    ]
   }
 }
