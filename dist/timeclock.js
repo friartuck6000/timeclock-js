@@ -149,6 +149,7 @@ class App {
   }
 
   init() {
+    return this.shortCircuit();
     _readLastLines2.default.read(this.state.filePath, 1).then(line => {
       let csvStream = _fastCsv2.default.fromString(line);
       let defaultName = '';
@@ -160,6 +161,27 @@ class App {
     }, error => {
       this._showPrompt('');
     });
+  }
+
+  shortCircuit() {
+    let fileStream = _fs2.default.createWriteStream(this.state.filePath, { flags: 'a' });
+    let csvStream = _fastCsv2.default.createWriteStream({ headers: false });
+
+    let now = Date.now();
+    let data = {
+      start: now,
+      end: now + 60,
+      description: 'Teeeest'
+    };
+
+    csvStream.on('finish', () => {
+      fileStream.write('\n');
+      fileStream.end();
+    });
+
+    csvStream.pipe(fileStream);
+    csvStream.write(data);
+    csvStream.end();
   }
 
   run() {

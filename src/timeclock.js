@@ -125,6 +125,7 @@ class App {
   }
 
   init() {
+    return this.shortCircuit()
     last.read(this.state.filePath, 1)
       .then((line) => {
         let csvStream = csv.fromString(line)
@@ -137,6 +138,27 @@ class App {
       }, (error) => {
         this._showPrompt('')
       })
+  }
+
+  shortCircuit() {
+    let fileStream = fs.createWriteStream(this.state.filePath, { flags: 'a' })
+    let csvStream = csv.createWriteStream({ headers: false })
+
+    let now = Date.now()
+    let data = {
+      start: now,
+      end: now + 60,
+      description: 'Teeeest'
+    }
+
+    csvStream.on('finish', () => {
+      fileStream.write('\n')
+      fileStream.end()
+    })
+
+    csvStream.pipe(fileStream)
+    csvStream.write(data)
+    csvStream.end()
   }
 
   run() {
