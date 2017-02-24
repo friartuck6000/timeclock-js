@@ -18,203 +18,161 @@ var _fs = require('fs');
 
 var _fs2 = _interopRequireDefault(_fs);
 
-var _readLastLines = require('read-last-lines');
-
-var _readLastLines2 = _interopRequireDefault(_readLastLines);
-
 var _readline = require('readline');
 
 var _readline2 = _interopRequireDefault(_readline);
+
+var _sliceFile = require('slice-file');
+
+var _sliceFile2 = _interopRequireDefault(_sliceFile);
 
 var _yargs = require('yargs');
 
 var _yargs2 = _interopRequireDefault(_yargs);
 
+var _io = require('./io');
+
+var io = _interopRequireWildcard(_io);
+
+var _util = require('./util');
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-// Set the filename that the CSV data should be written to
-const FILENAME = '_timeclock.csv';
+/**
+ * The name of the timesheet CSV file.
+ *
+ * @type  {string}  FILENAME
+ */
 
-// Set the number of MINUTES of inactivity allowed before the timeclock
-// automatically stops
+
+// Local modules
+const FILENAME = '_timesheet.csv';
+
+/**
+ * The time, in minutes, that is allowed before the timeclock is
+ * automatically stopped.
+ *
+ * @type  {number}  TIMEOUT
+ */
 
 
 // Dependencieeeeeeeeeeees
 const TIMEOUT = 30;
 
+/**
+ * Script state.
+ *
+ * @type  {Object}  state
+ */
 let state = {
-  path: null,
-  filename: FILENAME,
+  basePath: null,
   filePath: null,
+  stream: null,
+  timer: null,
   data: {
     start: null,
     end: null,
-    description: null
+    description: ''
   }
 };
 
-// App object
-class App {
-  /**
-   * Constructor; initializes state.
-   *
-   * @param  {Object}  argv
-   */
-  constructor(argv) {
-    this.state = Object.assign({}, state, {
-      path: argv._[0] || process.cwd()
-    });
-    this.state.filePath = `${this.state.path}/${this.state.filename}`;
-    this.waitTimeout = null;
-  }
+// -----------------------------------------------------------------------------
 
-  _write() {
-    let args = Array.prototype.slice.call(arguments);
-    args.forEach(msg => {
-      process.stdout.write(msg);
-    });
+/**
+ * Displays the task description prompt.
+ */
+const showPrompt = () => {
 
-    return this;
-  }
-
-  _writeln() {
-    this._write.apply(this, arguments);
-    process.stdout.write('\n');
-
-    return this;
-  }
-
-  _clear() {
-    process.stdout.clearLine();
-    process.stdout.cursorTo(0);
-
-    return this;
-  }
-
-  _showPrompt(defaultName) {
-    const reader = _readline2.default.createInterface({
+  const _doPrompt = defaultValue => {
+    let reader = _readline2.default.createInterface({
       input: process.stdin,
       output: process.stdout
     });
-    reader.question(_chalk2.default.cyan(`Task name [${defaultName}]: `), name => {
-      this.state.data = Object.assign(this.state.data, {
+    reader.question(_chalk2.default.cyan(`Task description [${defaultValue}]:\n`), value => {
+      state.data = Object.assign(state.data, {
         start: new Date(),
-        description: name || defaultName
+        description: value || defaultValue
       });
-      this.run();
+
+      run();
       reader.close();
     });
-  }
+  };
 
-  _wait() {
-    clearTimeout(this.waitTimeout);
-    setTimeout(() => {
-      this._writeln(' > ', _chalk2.default.yellow('Stopping timeclock due to inactivity.'));
-      this.finish();
-    }, TIMEOUT * 60000);
-  }
-
-  _roundMinutes(date, nearest, midpoint) {
-    let actualMinutes = date.getMinutes();
-    let remainder = actualMinutes % nearest;
-    let diff = nearest - remainder;
-    let rounded = remainder > midpoint ? actualMinutes + diff : actualMinutes - remainder;
-
-    date.setMinutes(rounded, 0, 0);
-
-    return this;
-  }
-
-  _saveCsv() {
-    let fileStream = _fs2.default.createWriteStream(this.state.filePath, { flags: 'a' });
-    let csvStream = (0, _fastCsv2.default)();
-
-    csvStream.transform(data => {
-      console.log(data);
-      return ['a', 'b', 'c'];
+  // Try to load the most recent entry description to use for the next entry
+  let lastLine = null;
+  let lastDescription = null;
+  let sliceable = (0, _sliceFile2.default)(state.filePath);
+  sliceable.slice(-1).on('error', () => {
+    _doPrompt('');
+  }).on('data', buf => {
+    if (lastLine !== null) sliceable.end();else lastLine = buf.toString();
+  }).on('end', () => {
+    let csvStream = _fastCsv2.default.fromString(lastLine);
+    csvStream.on('data', data => {
+      if (lastDescription !== null) csvStream.end();else lastDescription = data[2];
+    }).on('end', () => {
+      _doPrompt(lastDescription || '');
     });
-    console.log('writin stuff');
+  });
+};
 
-    fileStream.on('finish', () => {
-      console.log('dookie');
-    });
-    csvStream.on('finish', () => {
-      console.log('aww fuck yeah, all done with the csv');
-      fileStream.end();
-    });
+/**
+ * Restart the idle timer.
+ */
+const startTimer = () => {
+  clearTimeout(state.timer);
+  state.timer = setTimeout(() => {
+    io.writeln(' > ', _chalk2.default.yellow(`No activity for ${TIMEOUT} minutes; stopping timeclock.`));
+    finish();
+  }, TIMEOUT * 60000);
+};
 
-    csvStream.pipe(fileStream);
-    // csvStream.write(['one', 'two', 'three'])
-    csvStream.end();
-  }
+/**
+ * Initialize script.
+ *
+ * @param  {Object}  argv
+ */
+const init = argv => {
+  state.basePath = argv._[0] || process.cwd();
+  state.filePath = `${state.basePath}/${FILENAME}`;
 
-  init() {
-    return this.shortCircuit();
-    _readLastLines2.default.read(this.state.filePath, 1).then(line => {
-      let csvStream = _fastCsv2.default.fromString(line);
-      let defaultName = '';
-      csvStream.on('data', data => {
-        defaultName = data[2];
-        csvStream.end();
-      });
-      this._showPrompt(defaultName);
-    }, error => {
-      this._showPrompt('');
-    });
-  }
+  // Create write stream
+  state.stream = _fs2.default.createWriteStream(state.filePath, { flags: 'a' });
 
-  shortCircuit() {
-    let fileStream = _fs2.default.createWriteStream(this.state.filePath, { flags: 'a' });
-    let csvStream = _fastCsv2.default.createWriteStream({ headers: false });
+  // Show prompt and start running
+  showPrompt();
+};
 
-    let now = Date.now();
-    let data = {
-      start: now,
-      end: now + 60,
-      description: 'Teeeest'
-    };
+const run = () => {
+  io.writeln(' > ', _chalk2.default.green(`You're on the clock...`));
+  io.write(' > ');
 
-    csvStream.on('finish', () => {
-      fileStream.write('\n');
-      fileStream.end();
-    });
+  startTimer();
+  _chokidar2.default.watch(`${state.basePath}/**/*`, { ignoreInitial: true }).on('all', (event, path) => {
+    let relPath = path.replace(`${state.basePath}/`, '');
+    io.clear();
+    io.write(' > Latest change: ', _chalk2.default.magenta(relPath));
+    startTimer();
+  });
 
-    csvStream.pipe(fileStream);
-    csvStream.write(data);
-    csvStream.end();
-  }
+  process.on('SIGINT', () => {
+    io.writeln();
+    io.writeln(' > ', _chalk2.default.yellow('Stopping timeclock manually.'));
+    finish();
+  });
+};
 
-  run() {
-    this._writeln(' > ', _chalk2.default.green(`You're on the clock...`))._write(' > ');
+const finish = () => {
+  state.data.end = new Date();
+  console.log('all done');
+  console.log(state.data);
 
-    this._wait();
-    _chokidar2.default.watch(`${this.state.path}/**/*`, {
-      ignoreInitial: true
-    }).on('all', (event, path) => {
-      let relPath = path.replace(`${this.state.path}/`, '');
-      this._clear()._write(' > Latest change: ', _chalk2.default.magenta(relPath));
-      this._wait();
-    });
+  process.exit();
+};
 
-    process.on('SIGINT', () => {
-      this._writeln('\n > ', _chalk2.default.yellow('Clocking out manually.'));
-      this.finish();
+// -----------------------------------------------------------------------------
 
-      return false;
-    });
-  }
-
-  finish() {
-    this.state.data.end = new Date();
-
-    // Round start/end to previous/next 15 minutes
-    this._roundMinutes(this.state.data.start, 15, 10)._roundMinutes(this.state.data.end, 15, 5);
-
-    this._saveCsv();
-
-    process.exit();
-  }
-}
-
-let app = new App(_yargs2.default.argv);
-app.init();
+init(_yargs2.default.argv);
