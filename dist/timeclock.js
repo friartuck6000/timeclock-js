@@ -59,7 +59,7 @@ const FILENAME = '_timesheet.csv';
 
 
 // Dependencieeeeeeeeeeees
-const TIMEOUT = 30;
+const TIMEOUT = 15;
 
 /**
  * Script state.
@@ -125,7 +125,8 @@ const showPrompt = () => {
 const startTimer = () => {
   clearTimeout(state.timer);
   state.timer = setTimeout(() => {
-    io.writeln(' > ', _chalk2.default.yellow(`No activity for ${TIMEOUT} minutes; stopping timeclock.`));
+    io.writeln();
+    io.writeln('--> ', _chalk2.default.yellow(`No activity for ${TIMEOUT} minutes; stopping timeclock.`));
     finish();
   }, TIMEOUT * 60000);
 };
@@ -147,20 +148,20 @@ const init = argv => {
 };
 
 const run = () => {
-  io.writeln(' > ', _chalk2.default.green(`You're on the clock...`));
-  io.write(' > ');
+  io.writeln('--> ', _chalk2.default.green(`You're on the clock...`));
+  io.write('--> ');
 
   startTimer();
   _chokidar2.default.watch(`${state.basePath}/**/*`, { ignoreInitial: true }).on('all', (event, path) => {
     let relPath = path.replace(`${state.basePath}/`, '');
     io.clear();
-    io.write(' > Latest change: ', _chalk2.default.magenta(relPath));
+    io.write('--> Latest change: ', _chalk2.default.magenta(relPath));
     startTimer();
   });
 
   process.on('SIGINT', () => {
     io.writeln();
-    io.writeln(' > ', _chalk2.default.yellow('Stopping timeclock manually.'));
+    io.writeln('--> ', _chalk2.default.yellow('Stopping timeclock manually.'));
     finish();
   });
 };

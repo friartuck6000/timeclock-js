@@ -25,7 +25,7 @@ const FILENAME = '_timesheet.csv'
  *
  * @type  {number}  TIMEOUT
  */
-const TIMEOUT = 30
+const TIMEOUT = 15
 
 /**
  * Script state.
@@ -102,7 +102,8 @@ const showPrompt = () => {
 const startTimer = () => {
   clearTimeout(state.timer)
   state.timer = setTimeout(() => {
-    io.writeln(' > ', chalk.yellow(`No activity for ${TIMEOUT} minutes; stopping timeclock.`))
+    io.writeln()
+    io.writeln('--> ', chalk.yellow(`No activity for ${TIMEOUT} minutes; stopping timeclock.`))
     finish()
   }, TIMEOUT * 60000)
 }
@@ -124,21 +125,21 @@ const init = (argv) => {
 }
 
 const run = () => {
-  io.writeln(' > ', chalk.green(`You're on the clock...`))
-  io.write(' > ')
+  io.writeln('--> ', chalk.green(`You're on the clock...`))
+  io.write('--> ')
 
   startTimer()
   chokidar.watch(`${state.basePath}/**/*`, { ignoreInitial: true })
     .on('all', (event, path) => {
       let relPath = path.replace(`${state.basePath}/`, '')
       io.clear()
-      io.write(' > Latest change: ', chalk.magenta(relPath))
+      io.write('--> Latest change: ', chalk.magenta(relPath))
       startTimer()
     })
 
   process.on('SIGINT', () => {
     io.writeln()
-    io.writeln(' > ', chalk.yellow('Stopping timeclock manually.'))
+    io.writeln('--> ', chalk.yellow('Stopping timeclock manually.'))
     finish()
   })
 }
