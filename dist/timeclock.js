@@ -132,6 +132,24 @@ const startTimer = () => {
 };
 
 /**
+ * Write the session data to CSV.
+ */
+const writeCsv = () => {
+  let fileStream = _fs2.default.createWriteStream(state.filePath, { flags: 'a' });
+  let csvStream = _fastCsv2.default.createWriteStream({ headers: false });
+
+  csvStream.on('finish', () => {
+    console.log('nuuu');
+    fileStream.write('\n');
+    fileStream.end();
+  });
+
+  csvStream.pipe(fileStream);
+  csvStream.write(state.data);
+  csvStream.end();
+};
+
+/**
  * Initialize script.
  *
  * @param  {Object}  argv
@@ -141,12 +159,15 @@ const init = argv => {
   state.filePath = `${state.basePath}/${FILENAME}`;
 
   // Create write stream
-  state.stream = _fs2.default.createWriteStream(state.filePath, { flags: 'a' });
+  // state.stream = fs.createWriteStream(state.filePath, { flags: 'a' })
 
   // Show prompt and start running
   showPrompt();
 };
 
+/**
+ * Run the watcher and wait for timeout or manual exit.
+ */
 const run = () => {
   io.writeln('--> ', _chalk2.default.green(`You're on the clock...`));
   io.write('--> ');
@@ -166,10 +187,15 @@ const run = () => {
   });
 };
 
+/**
+ * Set end time and write CSV.
+ */
 const finish = () => {
   state.data.end = new Date();
-  console.log('all done');
-  console.log(state.data);
+  (0, _util.roundMinutes)(state.data.start, 15, 10);
+  (0, _util.roundMinutes)(state.data.end, 15, 5);
+
+  writeCsv();
 
   process.exit();
 };

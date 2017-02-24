@@ -109,6 +109,24 @@ const startTimer = () => {
 }
 
 /**
+ * Write the session data to CSV.
+ */
+const writeCsv = () => {
+  let fileStream = fs.createWriteStream(state.filePath, { flags: 'a' })
+  let csvStream = csv.createWriteStream({ headers: false })
+
+  csvStream.on('finish', () => {
+    console.log('nuuu')
+    fileStream.write('\n')
+    fileStream.end()
+  })
+
+  csvStream.pipe(fileStream)
+  csvStream.write(state.data)
+  csvStream.end()
+}
+
+/**
  * Initialize script.
  *
  * @param  {Object}  argv
@@ -118,12 +136,15 @@ const init = (argv) => {
   state.filePath = `${state.basePath}/${FILENAME}`
 
   // Create write stream
-  state.stream = fs.createWriteStream(state.filePath, { flags: 'a' })
+  // state.stream = fs.createWriteStream(state.filePath, { flags: 'a' })
 
   // Show prompt and start running
   showPrompt()
 }
 
+/**
+ * Run the watcher and wait for timeout or manual exit.
+ */
 const run = () => {
   io.writeln('--> ', chalk.green(`You're on the clock...`))
   io.write('--> ')
@@ -144,10 +165,15 @@ const run = () => {
   })
 }
 
+/**
+ * Set end time and write CSV.
+ */
 const finish = () => {
   state.data.end = new Date()
-  console.log('all done')
-  console.log(state.data)
+  roundMinutes(state.data.start, 15, 10)
+  roundMinutes(state.data.end, 15, 5)
+
+  writeCsv()
 
   process.exit()
 }
